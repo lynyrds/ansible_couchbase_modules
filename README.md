@@ -2,7 +2,12 @@
 
 ## cb_find_orchestrator
 
-Reliably detect the orchestrator for a Couchbase cluster
+Reliably detect the orchestrator node for a Couchbase cluster
+```
+The cluster manager supervises server configuration and interaction between servers within a Couchbase cluster. 
+It is a critical component that manages replication and rebalancing operations in Couchbase. 
+Although the cluster manager executes locally on each cluster node, it elects a clusterwide orchestrator node  to oversee cluster conditions and carry out appropriate cluster management functions.
+```
  
 ### Prerequisites
 * Ansible > 2.1
