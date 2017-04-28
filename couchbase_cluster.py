@@ -10,7 +10,7 @@ DOCUMENTATION = '''
 module: couchbase_cluster
 short_description: Manage Couchbase clusters
 description:
-  - The M(couchbase_server) module can create a Couchbase cluster, add/remove nodes, rebalance
+  - The M(couchbase_cluster) module can create a Couchbase cluster, add/remove nodes, rebalance
 author:
     - "Michael Hirschberg"
 options:
