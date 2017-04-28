@@ -16,7 +16,7 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
 
 ### Notes
 * The list of all nodes is needed to reliably detect the cluster's orchestrator.
-* Init and rebalance should be run once (`run_once: True`)
+* Tasks to init and rebalance should be set to run once (`run_once: True`)
 * Check mode is supported
 * Rebalance won't be issued if a bucket is found. Use `force: True` to rebalance anyway.
 * Tested on RHEL6 with Ansible 2.2.1 and Couchbase Enterprise 5.0 April build

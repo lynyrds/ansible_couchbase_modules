@@ -7,10 +7,10 @@
 
 DOCUMENTATION = '''
 ---
-module: couchbase-cluster
+module: couchbase_cluster
 short_description: Manage Couchbase clusters
 description:
-  - The M(couchbase-server) module can create a Couchbase cluster, add/remove nodes, rebalance
+  - The M(couchbase_server) module can create a Couchbase cluster, add/remove nodes, rebalance
 author:
     - "Michael Hirschberg"
 options:
@@ -166,7 +166,6 @@ class Couchbase(object):
 
     # Get cluster orchestrator
     orchestra = dict(set(all_orchestrators.items()) - set(all_local_orchestrators.items()))
-    done = False
 
     if orchestra == {}:
       orchestrators['cluster'] = default
