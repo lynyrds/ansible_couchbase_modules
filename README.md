@@ -1,21 +1,25 @@
 # Ansible modules for Couchbase
 
-## cb_find_orchestrator
+## couchbase_cluster
 
-Reliably detect the orchestrator node for a Couchbase cluster
-```
-The cluster manager supervises server configuration and interaction between servers within a Couchbase cluster. 
-It is a critical component that manages replication and rebalancing operations in Couchbase. 
-Although the cluster manager executes locally on each cluster node, it elects a clusterwide orchestrator node  to oversee cluster conditions and carry out appropriate cluster management functions.
-```
+* Init a Couchbase cluster
+* Join nodes to a Couchbase cluster
+* Rebalance a Couchbase cluster
  
 ### Prerequisites
-* Ansible > 2.1
-* python requests installed on the Ansible control machine
-* Couchbase cluster
+* Ansible > 2.2
+* python requests installed
+* Couchbase cluster binaries installed
 
 ### Installing
 Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variable, or alongside playbook under `./library`
+
+### Notes
+* The list of all nodes is needed to reliably detect the cluster's orchestrator.
+* Init and rebalance should be run once (`run_once: True`)
+* Check mode is supported
+* Rebalance won't be issued if a bucket is found. Use `force: True` to rebalance anyway.
+* Tested on RHEL6 with Ansible 2.2.1 and Couchbase Enterprise 5.0 April build
 
 ### Example playbook
 
@@ -23,36 +27,35 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
 ---
 - hosts: all
   tasks:
-  - name: "Get orchestrator"
-    cb_find_orchestrator:
+  - name: "Init cluster"
+    couchbase_cluster:
       user: Administrator
       password: SuperSecretPassword
       nodes:
         - cb_node01
         - cb_node02
         - cb_node03
-    delegate_to: localhost
-    register: cmd
+    init: True
+    cluster_mem: 1024
     run_once: True
 
-  - name: "Print orchestrator's name"
-    debug: msg={{ cmd.orchestrator }}
-```
+  - name: "Join nodes"
+    couchbase_cluster:
+      user: Administrator
+      password: SuperSecretPassword
+      nodes:
+        - cb_node01
+        - cb_node02
+        - cb_node03
+    join: True
 
-### Possible results
-1. A completely new cluster, not initialized:
-```
-ok: [localhost] => {
-    "msg": "127.0.0.1"
-}
-```
-2. At least one node has been initialized (this is probably the node you'll be delegating all Couchbase related tasks to):
-```
-ok: [localhost] => {
-    "msg": "cb_node03"
-}
-```
-3. Couchbase REST API not available (Firewall? No binaries installed? couchbase-server service not started?):
-```
-fatal: [localhost -> localhost]: FAILED! => {"changed": false, "failed": true, "msg": "Couchbase REST API is not accessible!"}
+  - name: "Rebalance"
+    couchbase_cluster:
+      user: Administrator
+      password: SuperSecretPassword
+      nodes:
+        - cb_node01
+        - cb_node02
+        - cb_node03
+    rebalance: True
 ```
