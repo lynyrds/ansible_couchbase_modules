@@ -4,6 +4,7 @@
 #
 # Change log:
 # 2017-04-28: Initial commit
+# 2017-05-29: Add bucket creation
 
 DOCUMENTATION = '''
 ---
@@ -19,7 +20,7 @@ options:
       - Couchbase admin user
     required: true
   admin_password:
-      - Couchbase admin password
+      - Couchbase admin password. Make sure you set no_log=True in your tasks!
     required: true
   admin_port:
       - Couchbase admin port
@@ -61,6 +62,30 @@ options:
     description:
       - Index RAM quota, MB
     required: false
+  bucket_create:
+    description:
+      - If a bucket should be created. User run_once: True in your tasks
+    required: false
+    default: false
+  bucket_name:
+    description:
+      - Bucket to be created. Mandatory, if bucket_create=true.
+  bucket_mem:
+    description:
+      - Memory assigned to the above bucket on each node, MB. Mandatory, if bucket_create=true.
+    required: false
+  bucket_replica:
+    description:
+      - Amount of replica copies for the above bucket. Default is 1.
+    required: False
+    default: 1
+    choices: [0, 1, 2, 3]
+  bucket_type:
+    description:
+      - Optional bucket type, either couchbase or ephemeral. The default is couchbase.
+    required: false
+    choices: ["couchbase", "ephemeral"]
+    default: "couchbase"
 '''
 
 EXAMPLES = '''
@@ -74,8 +99,9 @@ EXAMPLES = '''
       - node01
       - node02
     init: True
-    cluster_mem: 1024
+    cluster_mem: 10240
   run_once: True
+  no_log: True
 
 - name: "Join nodes"
   couchbase_cluster:
@@ -85,6 +111,7 @@ EXAMPLES = '''
       - node01
       - node02
     join: True
+  no_log: True
 
 - name: "Rebalance"
   couchbase_cluster:
@@ -95,6 +122,21 @@ EXAMPLES = '''
       - node02
     rebalance: True
   run_once: True
+  no_log: True
+  
+- name: "Create bucket"
+  couchbase_cluster:
+    cb_admin: Administrator
+    admin_password: MySuperSecretPassword
+    nodes:
+      - node01
+      - node02
+    bucket_create: true
+    bucket_name: iceBucket
+    bucket_mem: 1024
+    bucket_replica: 2
+  run_once: True
+  no_log: True
 '''
 
 
@@ -125,6 +167,11 @@ class Couchbase(object):
     self.fts_mem = module.params['fts_mem']
     self.services = module.params['services']
     self.group = module.params['group']
+    self.bucket_create = module.params['bucket_create']
+    self.bucket_name = module.params['bucket_name']
+    self.bucket_mem = module.params['bucket_mem']
+    self.bucket_replica = module.params['bucket_replica']
+    self.bucket_type = module.params['bucket_type']
 
   def rename_first_node(self):
    # There is no return code, no nothing to be evaluated -- I just assume the node has been renamed OK
@@ -351,6 +398,32 @@ class Couchbase(object):
       changed = True
 
     return dict(failed=failed, changed=changed, msg=msg)
+    
+  def create_bucket(self):
+    changed = False
+    failed,masters,msg = map(self.check_new().get,('failed','orchestrators','msg'))
+
+    cmd = [
+      cbcli, 'bucket-create', 
+      '-c', masters['cluster'],
+      '--bucket=' + self.bucket_name,
+      '--bucket-type=' + self.bucket_type,
+      '--bucket-ramsize=' + str(self.bucket_mem),
+      '--bucket-replica=' + str(self.bucket_replica),      
+      '--wait',      
+      '--username=' + self.cb_admin, '--password=' + self.admin_password,      
+    ]
+
+    rc, stdout, stderr = self.module.run_command(cmd)
+    
+    if rc == 0:
+      changed = True
+      msg = "Bucket " + self.bucket_name + " has been created"
+    else:
+      failed = True
+      msg = "Bucket " + self.bucket_name + " creation has failed!"
+    
+    return dict(rc=rc, failed=failed, changed=changed, msg=msg)
 
 ### Check functions ###
 
@@ -406,6 +479,28 @@ class Couchbase(object):
 
     return dict(failed=failed, changed=changed, msg=msg)
     
+  def check_bucket(self):
+    changed = False
+    failed = False
+    msg = ""
+    url = "http://localhost:8091/pools/default/buckets/" + self.bucket_name
+    if not self.bucket_name or not self.bucket_mem:
+      failed = True
+      msg = "Please provide both bucket_name and bucket_mem !"
+    else:
+      try:
+        my_bucket = requests.get(url, auth=(self.cb_admin,self.admin_password))
+        if my_bucket.status_code != 200:
+          changed = True
+          msg = "Bucket " + self.bucket_name + " not found, will be created"
+      except:
+        failed = True
+        msg = "Connection to the Couchbase REST API has failed!"
+    
+    return dict(failed=failed, changed=changed, msg=msg)
+    
+    
+      
    
   def execute(self):
     if self.init:
@@ -425,7 +520,14 @@ class Couchbase(object):
       if (not failed and changed) or (not failed and not changed and self.force):
         failed,changed,msg = map(self.run_rebalance().get, ('failed','changed','msg'))
       return dict(failed=failed,changed=changed,msg=msg)
-
+      
+    if self.bucket_create:
+      failed,changed,msg = map(self.check_bucket().get, ('failed','changed','msg'))
+      if not failed and changed:
+        failed,changed,msg = map(self.create_bucket().get, ('failed','changed','msg'))
+      return dict(failed=failed,changed=changed,msg=msg)
+      
+      
 def main():
   fields = dict(
     # Common things
@@ -445,6 +547,12 @@ def main():
     fts_mem=dict(required=False),
     index_mem=dict(required=False),
     services=dict(required=False),
+    # Buckets config
+    bucket_create=dict(required=False, default=False, type="bool"),
+    bucket_name=dict(required=False),
+    bucket_mem=dict(required=False),
+    bucket_replica=dict(required=False, default=1),    
+    bucket_type=dict(required=False, default="couchbase", choices=["couchbase", "ephemeral"]),
   )
 
   module = AnsibleModule(argument_spec=fields, supports_check_mode=True)
