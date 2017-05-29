@@ -6,6 +6,7 @@
 * Join nodes to a Couchbase cluster
 * Create a Couchbase or Ephemeral bucket
 * Rebalance a Couchbase cluster
+* Enable LDAP authentication
  
 ### Prerequisites
 * Ansible >= 2.3
@@ -18,8 +19,10 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
 ### Notes
 * The list of all nodes is needed to reliably detect the cluster's orchestrator.
 * Tasks to init, rebalance and bucket create should be set to run once (`run_once: True`)
-* Check mode is supported
+* Check mode is supported, but not for enabling LDAP as there is no way to verify if it is enabled or not
 * Rebalance won't be issued if a bucket is found. Use `force: True` to rebalance anyway.
+* For more details on LDAP/PAM authentication please refer to the official Couchbase documentation: 
+  https://developer.couchbase.com/documentation/server/5.0/security/security-authentication.html
 * Tested on RHEL6 with Ansible 2.3 and Couchbase Enterprise 5.0 beta build
 
 ### Example playbook
@@ -61,6 +64,18 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
         - cb_node02
         - cb_node03
       rebalance: True
+    run_once: True
+    no_log: True
+
+  - name: "Enable LDAP"
+    couchbase_cluster:
+      user: Administrator
+      password: SuperSecretPassword
+      nodes:
+        - cb_node01
+        - cb_node02
+        - cb_node03
+      ldap_enabled: True
     run_once: True
     no_log: True
 
