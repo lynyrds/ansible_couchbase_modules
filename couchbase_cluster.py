@@ -5,6 +5,7 @@
 # Change log:
 # 2017-04-28: Initial commit
 # 2017-05-29: Add bucket creation
+# 2017-05-30: Add enable LDAP
 
 DOCUMENTATION = '''
 ---
@@ -86,6 +87,11 @@ options:
     required: false
     choices: ["couchbase", "ephemeral"]
     default: "couchbase"
+  ldap_enabled:
+    description:
+      - Enable LDAP authentication. For more information please refer to the official Couchbase documentation
+    required: false
+    default: false
 '''
 
 EXAMPLES = '''
@@ -100,6 +106,7 @@ EXAMPLES = '''
       - node02
     init: True
     cluster_mem: 10240
+    ldap_enabled: True
   run_once: True
   no_log: True
 
@@ -172,6 +179,7 @@ class Couchbase(object):
     self.bucket_mem = module.params['bucket_mem']
     self.bucket_replica = module.params['bucket_replica']
     self.bucket_type = module.params['bucket_type']
+    self.ldap_enabled = module.params['ldap_enabled']
 
   def rename_first_node(self):
    # There is no return code, no nothing to be evaluated -- I just assume the node has been renamed OK
@@ -423,9 +431,34 @@ class Couchbase(object):
       failed = True
       msg = "Bucket " + self.bucket_name + " creation has failed!"
     
-    return dict(rc=rc, failed=failed, changed=changed, msg=msg)
+    return dict(failed=failed, changed=changed, msg=msg)
+    
+  def enable_ldap(self):
+    changed = False
+    rc = 0
+    msg = ""
+    failed,masters,msg = map(self.check_new().get,('failed','orchestrators','msg'))
+    
+    
+    if self.ldap_enabled:
+      cmd = [
+        cbcli, 'setting-ldap', 
+        '-c', masters['cluster'],
+        '--ldap-enabled=1',
+        '--username=' + self.cb_admin, '--password=' + self.admin_password,      
+      ]
+      rc, stdout, stderr = self.module.run_command(cmd)
+      if rc == 0:
+        changed = True
+        msg = "LDAP enabled"
+      else:
+        failed = True
+        msg = "LDAP was NOT enabled!"
+        
+    return dict(failed=failed, changed=changed, msg=msg)
+    
 
-### Check functions ###
+### Check functions --> ###
 
   def check_init(self):
     if not self.cluster_mem:
@@ -498,10 +531,9 @@ class Couchbase(object):
         msg = "Connection to the Couchbase REST API has failed!"
     
     return dict(failed=failed, changed=changed, msg=msg)
-    
-    
-      
-   
+
+### <-- Check functions ###
+
   def execute(self):
     if self.init:
       failed,changed,msg = map(self.check_init().get, ('failed','changed','msg'))
@@ -525,6 +557,10 @@ class Couchbase(object):
       failed,changed,msg = map(self.check_bucket().get, ('failed','changed','msg'))
       if not failed and changed:
         failed,changed,msg = map(self.create_bucket().get, ('failed','changed','msg'))
+      return dict(failed=failed,changed=changed,msg=msg)
+      
+    if self.ldap_enabled:
+      failed,changed,msg = map(self.enable_ldap().get, ('failed','changed','msg'))
       return dict(failed=failed,changed=changed,msg=msg)
       
       
@@ -553,6 +589,8 @@ def main():
     bucket_mem=dict(required=False),
     bucket_replica=dict(required=False, default=1),    
     bucket_type=dict(required=False, default="couchbase", choices=["couchbase", "ephemeral"]),
+    # RBAC configs
+    ldap_enabled=dict(required=False, default=False, type="bool"),
   )
 
   module = AnsibleModule(argument_spec=fields, supports_check_mode=True)
@@ -568,6 +606,10 @@ def main():
 
     if module.params['rebalance']:
       result = Couchbase(module).check_rebalance()
+      module.exit_json(**result)
+      
+    if module.params['bucket_create']:
+      result = Couchbase(module).check_bucket()
       module.exit_json(**result)
 
   result = Couchbase(module).execute()
