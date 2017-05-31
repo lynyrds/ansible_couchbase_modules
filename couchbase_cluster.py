@@ -6,7 +6,7 @@
 # 2017-04-28: Initial commit
 # 2017-05-29: Add bucket creation
 # 2017-05-30: Add enable LDAP
-# 2017-05-31: Add create/delete user
+# 2017-05-31: Add create/delete user, setting autofailover
 
 DOCUMENTATION = '''
 ---
@@ -64,6 +64,15 @@ options:
     description:
       - Index RAM quota, MB
     required: false
+  auto_failover:
+    description:
+      - Enable / disable auto failover (please use run_once: True in your task!)
+    required: false
+  auto_failover_timeout:
+    description:
+      - Set auto failover timeout. Minimum=5 seconds. Default=30 seconds
+    required: false
+    default: 30
   bucket_create:
     description:
       - If a bucket should be created. User run_once: True in your tasks
@@ -146,6 +155,18 @@ EXAMPLES = '''
       - node01
       - node02
     join: True
+  no_log: True
+  
+- name: "Enable autofailover"
+  couchbase_cluster:
+    cb_admin: Administrator
+    admin_password: MySuperSecretPassword
+    nodes:
+      - node01
+      - node02
+    auto_failover: True
+    auto_failover_timeout: 120
+  run_once: True
   no_log: True
 
 - name: "Rebalance"
@@ -258,6 +279,8 @@ class Couchbase(object):
     self.rbac_user_name = module.params['rbac_user_name']
     self.rbac_user_password = module.params['rbac_user_password']
     self.rbac_roles = module.params['rbac_roles']
+    self.auto_failover = module.params['auto_failover']
+    self.auto_failover_timeout = module.params['auto_failover_timeout']
 
   def rename_first_node(self):
    # There is no return code, no nothing to be evaluated -- I just assume the node has been renamed OK
@@ -588,7 +611,37 @@ class Couchbase(object):
       msg = msg + stderr
       
     return dict(failed=failed, changed=changed, msg=msg)
+
+  def manage_autofailover(self):
+    changed = False
+    msg = ""
+    failed,masters,msg = map(self.check_new().get,('failed','orchestrators','msg'))
+    enabled = "0"
+    enabled_text = "disabled"
+    
+    if self.auto_failover:
+      enabled = "1"
+      enabled_text = "enabled"
       
+    cmd = [
+      cbcli, 'setting-autofailover', 
+      '-c', masters['cluster'],
+      '--enable-auto-failover=' + enabled,
+      '--auto-failover-timeout=' + self.auto_failover_timeout,
+      '--username=' + self.cb_admin, '--password=' + self.admin_password,      
+    ]
+    
+    rc, stdout, stderr = self.module.run_command(cmd)
+    
+    if rc == 0:
+      changed = True
+      msg = "Autofailover has been " + enabled_text
+    else:
+      failed = True
+      msg = msg + stderr
+        
+    return dict(failed=failed, changed=changed, msg=msg)
+
 ### Check functions --> ###
 
   def check_init(self):
@@ -777,6 +830,9 @@ class Couchbase(object):
       failed,changed,msg = map(self.createUser().get, ('failed','changed','msg'))
       return dict(failed=failed,changed=True,msg=msg)
       
+    if self.auto_failover == True or self.auto_failover == False:
+      failed,changed,msg = map(self.manage_autofailover().get, ('failed','changed','msg'))
+      return dict(failed=failed,changed=True,msg=msg)
       
 def main():
   fields = dict(
@@ -811,6 +867,9 @@ def main():
     rbac_user_name=dict(required=False),
     rbac_user_password=dict(required=False),
     rbac_roles=dict(required=False, default=[], type="list"),
+    # Failover config
+    auto_failover=dict(required=False, type='bool'),
+    auto_failover_timeout=dict(required=False, default="30"),
   )
 
   module = AnsibleModule(argument_spec=fields, supports_check_mode=True)
