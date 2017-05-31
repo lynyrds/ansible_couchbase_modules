@@ -6,6 +6,7 @@
 # 2017-04-28: Initial commit
 # 2017-05-29: Add bucket creation
 # 2017-05-30: Add enable LDAP
+# 2017-05-31: Add create/delete user
 
 DOCUMENTATION = '''
 ---
@@ -70,10 +71,10 @@ options:
     default: false
   bucket_name:
     description:
-      - Bucket to be created. Mandatory, if bucket_create=true.
+      - Bucket to be created. Mandatory if bucket_create=true.
   bucket_mem:
     description:
-      - Memory assigned to the above bucket on each node, MB. Mandatory, if bucket_create=true.
+      - Memory assigned to the above bucket on each node, MB. Mandatory if bucket_create=true.
     required: false
   bucket_replica:
     description:
@@ -92,6 +93,33 @@ options:
       - Enable LDAP authentication. For more information please refer to the official Couchbase documentation
     required: false
     default: false
+  create_user:
+    description:
+      - If a user should be created. Use run_once: True in your tasks
+    reqired: false
+    default: false
+  delete_user:
+    description:
+      - If a user should be deleted. Use run_once: True in your tasks
+    required: false
+    default: false
+  user_type:
+    description:
+      - If the user should local or external
+    required: false
+    default: local
+    choices: ["local", "external"]
+  rbac_user_name:
+    description:
+      - User name to be created/deleted. Mandatory if create_user or delete_user is set to True
+  rbac_user_password:
+    description:
+      - The RBAC user password, if user_type=local
+    required: false
+  rbac_roles:
+    description:
+      - A mandatory list of rbac user roles if creating a new user. For more information please refer to the official Couchbase documentation
+    required: false
 '''
 
 EXAMPLES = '''
@@ -144,6 +172,49 @@ EXAMPLES = '''
     bucket_replica: 2
   run_once: True
   no_log: True
+  
+- name: "Create user"
+  couchbase_cluster:
+    cb_admin: Administrator
+    admin_password: MySuperSecretPassword
+    nodes:
+      - node01
+      - node02
+    bucket_create: true
+    bucket_name: iceBucket
+    bucket_mem: 1024
+    bucket_replica: 2
+  run_once: True
+  no_log: True
+  
+- name: "Create user"
+  couchbase_cluster:
+    cb_admin: Administrator
+    admin_password: MySuperSecretPassword
+    nodes:
+      - node01
+      - node02
+    create_user: true
+    rbac_user_name: alice
+    rbac_user_password: SuperSecretThePassword123
+    rbac_roles:
+      - ro_admin
+      - replication_admin    
+  run_once: True
+  no_log: True
+  
+- name: "Delete user"
+  couchbase_cluster:
+    cb_admin: Administrator
+    admin_password: MySuperSecretPassword
+    nodes:
+      - node01
+      - node02
+    delete_user: true
+    rbac_user_name: bobby
+    user_type: external
+  run_once: True
+  no_log: True
 '''
 
 
@@ -151,6 +222,7 @@ from ansible.module_utils.basic import AnsibleModule
 from time import sleep
 import socket
 import requests
+import json
 import os
 
 cbcli = "/opt/couchbase/bin/couchbase-cli"
@@ -180,6 +252,12 @@ class Couchbase(object):
     self.bucket_replica = module.params['bucket_replica']
     self.bucket_type = module.params['bucket_type']
     self.ldap_enabled = module.params['ldap_enabled']
+    self.create_user = module.params['create_user']
+    self.delete_user = module.params['delete_user']
+    self.user_type = module.params['user_type']
+    self.rbac_user_name = module.params['rbac_user_name']
+    self.rbac_user_password = module.params['rbac_user_password']
+    self.rbac_roles = module.params['rbac_roles']
 
   def rename_first_node(self):
    # There is no return code, no nothing to be evaluated -- I just assume the node has been renamed OK
@@ -419,7 +497,7 @@ class Couchbase(object):
       '--bucket-ramsize=' + str(self.bucket_mem),
       '--bucket-replica=' + str(self.bucket_replica),      
       '--wait',      
-      '--username=' + self.cb_admin, '--password=' + self.admin_password,      
+      '--username=' + self.cb_admin, '--password=' + self.admin_password,
     ]
 
     rc, stdout, stderr = self.module.run_command(cmd)
@@ -456,8 +534,61 @@ class Couchbase(object):
         msg = "LDAP was NOT enabled!"
         
     return dict(failed=failed, changed=changed, msg=msg)
-    
+ 
+  def createUser(self):
+    changed = False
+    failed,masters,msg = map(self.check_new().get,('failed','orchestrators','msg'))
 
+    cmd = [
+      cbcli, 'user-manage', 
+      '-c', masters['cluster'],
+      '--username=' + self.cb_admin, '--password=' + self.admin_password,
+      '--set',
+      '--rbac-username=' + self.rbac_user_name,
+    ]
+    
+    if self.user_type == "local":
+      cmd.append("--rbac-password=" + self.rbac_user_password)
+      
+    cmd.extend([
+      '--roles=' + ','.join(self.rbac_roles),
+      '--auth-domain=' + self.user_type
+    ])  
+    
+    rc, stdout, stderr = self.module.run_command(cmd)
+    
+    if rc == 0:
+      changed = True
+      msg = msg + " User has been created."
+    else:
+      failed = True
+      msg = msg + stderr
+    
+    return dict(failed=failed, changed=changed, msg=msg)
+    
+  def deleteUser(self):
+    changed = False
+    failed,masters,msg = map(self.check_new().get,('failed','orchestrators','msg'))
+
+    cmd = [
+      cbcli, 'user-manage', 
+      '-c', masters['cluster'],
+      '--username=' + self.cb_admin, '--password=' + self.admin_password,
+      '--delete',
+      '--rbac-username=' + self.rbac_user_name,
+      '--auth-domain=' + self.user_type
+    ]    
+    rc, stdout, stderr = self.module.run_command(cmd)
+    
+    if rc == 0:
+      changed = True
+      msg = msg + " User has been removed."
+    else:
+      failed = True
+      msg = msg + stderr
+      
+    return dict(failed=failed, changed=changed, msg=msg)
+      
 ### Check functions --> ###
 
   def check_init(self):
@@ -531,6 +662,78 @@ class Couchbase(object):
         msg = "Connection to the Couchbase REST API has failed!"
     
     return dict(failed=failed, changed=changed, msg=msg)
+    
+  def check_user(self):
+    # This function is NOT verifying user's password -- because there's no way how to.
+    changed = False
+    failed = False
+    msg = ""
+    
+    if self.create_user or self.delete_user:
+      if not self.rbac_user_name:
+        failed = True
+        msg = "Please provide a user name! "
+    if self.create_user:
+      if self.user_type == "local" and not self.rbac_user_password:
+        failed = True
+        msg = msg + "Please provide RBAC password! "
+      if not self.rbac_roles:
+        failed = True
+        msg = msg + "Please provide a roles list! "
+        
+    failed,masters,msg = map(self.check_new().get,('failed','orchestrators','msg'))
+    
+    cmd = [
+      cbcli, 'user-manage', 
+      '-c', masters['cluster'],
+      '--list',
+      '--username=' + self.cb_admin, '--password=' + self.admin_password,      
+    ]
+    rc, stdout, stderr = self.module.run_command(cmd)
+    
+    if rc != 0:
+      failed = True
+    elif self.create_user:
+      name_ok = False
+      type_ok = False
+      role_ok = False
+      my_roles = []
+      for item in json.loads(stdout):
+        if item['id'] == self.rbac_user_name:
+          msg = msg + "User OK. "
+          name_ok = True
+          for role in item['roles']:
+            if len(role) > 1:
+              my_roles.append(role.values()[1] + "[" + role.values()[0] + "]")
+            else:
+              my_roles.append(role['role'])
+          if item['domain'] == self.user_type:
+            msg = msg + "User type OK. "
+            type_ok = True
+      if not name_ok:
+        msg = msg + "User not found. "
+      if not type_ok:
+        msg = msg + "Wrong user type. "
+      if sorted(my_roles) == sorted(self.rbac_roles):
+        msg = msg + "All roles found. "
+        role_ok = True
+      else:
+        msg = msg + "Not all roles found. "
+      
+      if not name_ok or not type_ok or not role_ok:
+        changed = True
+    elif self.delete_user:
+      for item in json.loads(stdout):
+        if item['id'] == self.rbac_user_name:
+          msg = msg + "User will be removed. "
+          changed = True
+        else: 
+          msg = msg + "User not found"
+    
+    return dict(failed=failed, changed=changed, msg=msg)
+    
+        
+    
 
 ### <-- Check functions ###
 
@@ -563,6 +766,17 @@ class Couchbase(object):
       failed,changed,msg = map(self.enable_ldap().get, ('failed','changed','msg'))
       return dict(failed=failed,changed=changed,msg=msg)
       
+    if self.delete_user:
+      failed,changed,msg = map(self.check_user().get, ('failed','changed','msg'))
+      if not failed and changed:
+        failed,changed,msg = map(self.deleteUser().get, ('failed','changed','msg'))
+      return dict(failed=failed,changed=changed,msg=msg)
+      
+    # Because there is no way how to verify user's password, let's say it's always runs and always "changed"
+    if self.create_user:
+      failed,changed,msg = map(self.createUser().get, ('failed','changed','msg'))
+      return dict(failed=failed,changed=True,msg=msg)
+      
       
 def main():
   fields = dict(
@@ -589,8 +803,14 @@ def main():
     bucket_mem=dict(required=False),
     bucket_replica=dict(required=False, default=1),    
     bucket_type=dict(required=False, default="couchbase", choices=["couchbase", "ephemeral"]),
-    # RBAC configs
+    # RBAC config
     ldap_enabled=dict(required=False, default=False, type="bool"),
+    create_user=dict(required=False, default=False, type="bool"),
+    delete_user=dict(required=False, default=False, type="bool"),
+    user_type=dict(required=False, default="local", choices=["local", "external"]),
+    rbac_user_name=dict(required=False),
+    rbac_user_password=dict(required=False),
+    rbac_roles=dict(required=False, default=[], type="list"),
   )
 
   module = AnsibleModule(argument_spec=fields, supports_check_mode=True)
@@ -610,6 +830,10 @@ def main():
       
     if module.params['bucket_create']:
       result = Couchbase(module).check_bucket()
+      module.exit_json(**result)
+      
+    if module.params['create_user'] or module.params['delete_user']:
+      result = Couchbase(module).check_user()
       module.exit_json(**result)
 
   result = Couchbase(module).execute()
