@@ -9,6 +9,7 @@
 * Enable LDAP authentication
 * Create RBAC user
 * Delete RBAC user
+* Manage autofailover
  
 ### Prerequisites
 * Ansible >= 2.3
@@ -21,7 +22,7 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
 ### Notes
 * The list of all nodes is needed to reliably detect the cluster's orchestrator.
 * Tasks to init, rebalance and bucket create should be set to run once (`run_once: True`)
-* Check mode is supported, but not for enabling LDAP as there is no way to verify if it is enabled or not
+* Check mode is supported, but not for enabling LDAP as there is no way to verify if it is enabled or not, same goes for setting autofailover and audit
 * RBAC user create is checked for everything but password. That means, create_user: True is going to be executed every time.
 * For more details on RBAC please refer to the official Couchbase documentation:
   https://developer.couchbase.com/documentation/server/5.0/security/security-authorization.html
@@ -70,6 +71,18 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
         - cb_node02
         - cb_node03
       rebalance: True
+    run_once: True
+    no_log: True
+
+  - name: "Enable autofailover"
+    couchbase_cluster:
+      cb_admin: Administrator
+      admin_password: MySuperSecretPassword
+      nodes:
+        - node01
+        - node02
+      auto_failover: True
+      auto_failover_timeout: 120
     run_once: True
     no_log: True
 
