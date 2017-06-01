@@ -10,6 +10,7 @@
 * Create RBAC user
 * Delete RBAC user
 * Manage autofailover
+* Manage audit
  
 ### Prerequisites
 * Ansible >= 2.3
@@ -83,6 +84,17 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
         - node02
       auto_failover: True
       auto_failover_timeout: 120
+    run_once: True
+    no_log: True
+
+  - name: "Enable audit"
+    couchbase_cluster:
+      cb_admin: Administrator
+      admin_password: MySuperSecretPassword
+      nodes:
+        - node01
+        - node02
+      audit_enabled: True
     run_once: True
     no_log: True
 
