@@ -7,6 +7,7 @@
 # 2017-05-29: Add bucket creation
 # 2017-05-30: Add enable LDAP
 # 2017-05-31: Add create/delete user, setting autofailover
+# 2017-06-01: Add enable/disable audit
 
 DOCUMENTATION = '''
 ---
@@ -73,6 +74,20 @@ options:
       - Set auto failover timeout. Minimum=5 seconds. Default=30 seconds
     required: false
     default: 30
+  audit_enabled:
+    description:
+      - Enable or disable audit (please use run_once: True in your task!)
+    required: false
+  audit_log_rotate_interval:
+    description:
+      - Audit log rotation interval, in seconds. Default is 86400 (24 hours)
+    required: false
+    default: 86400
+ audit_log_path:
+    description:
+      - Specifies the auditing log path. This should be a path to a folder where the auditing log is kept. The folder must exist on all servers in the cluster.
+    required: false
+    default: /opt/couchbase/var/lib/couchbase/logs
   bucket_create:
     description:
       - If a bucket should be created. User run_once: True in your tasks
@@ -166,6 +181,17 @@ EXAMPLES = '''
       - node02
     auto_failover: True
     auto_failover_timeout: 120
+  run_once: True
+  no_log: True
+  
+- name: "Enable audit"
+  couchbase_cluster:
+    cb_admin: Administrator
+    admin_password: MySuperSecretPassword
+    nodes:
+      - node01
+      - node02
+    audit_enabled: True
   run_once: True
   no_log: True
 
@@ -281,6 +307,9 @@ class Couchbase(object):
     self.rbac_roles = module.params['rbac_roles']
     self.auto_failover = module.params['auto_failover']
     self.auto_failover_timeout = module.params['auto_failover_timeout']
+    self.audit_enabled = module.params['audit_enabled']
+    self.audit_log_rotate_interval = module.params['audit_log_rotate_interval']
+    self.audit_log_path = module.params['audit_log_path']
 
   def rename_first_node(self):
    # There is no return code, no nothing to be evaluated -- I just assume the node has been renamed OK
@@ -628,7 +657,7 @@ class Couchbase(object):
       '-c', masters['cluster'],
       '--enable-auto-failover=' + enabled,
       '--auto-failover-timeout=' + self.auto_failover_timeout,
-      '--username=' + self.cb_admin, '--password=' + self.admin_password,      
+      '--username=' + self.cb_admin, '--password=' + self.admin_password,
     ]
     
     rc, stdout, stderr = self.module.run_command(cmd)
@@ -636,6 +665,39 @@ class Couchbase(object):
     if rc == 0:
       changed = True
       msg = "Autofailover has been " + enabled_text
+    else:
+      failed = True
+      msg = msg + stderr
+        
+    return dict(failed=failed, changed=changed, msg=msg)
+    
+  def manage_audit(self):
+    changed = False
+    msg = ""
+    failed,masters,msg = map(self.check_new().get,('failed','orchestrators','msg'))
+    enabled = "0"
+    enabled_text = "disabled"
+    
+    cmd = [
+      cbcli, 'setting-audit', 
+      '-c', masters['cluster'],
+      '--username=' + self.cb_admin, '--password=' + self.admin_password,
+      '--audit-enabled=' + enabled,      
+    ]
+
+    if self.audit_enabled:
+      enabled = "1"
+      enabled_text = "enabled"
+      cmd.extend([
+      '--audit-log-rotate-interval=' + self.audit_log_rotate_interval,
+      '--audit-log-path=' + self.audit_log_path,
+      ])
+      
+    rc, stdout, stderr = self.module.run_command(cmd)
+    
+    if rc == 0:
+      changed = True
+      msg = "Audit has been " + enabled_text
     else:
       failed = True
       msg = msg + stderr
@@ -825,15 +887,21 @@ class Couchbase(object):
         failed,changed,msg = map(self.deleteUser().get, ('failed','changed','msg'))
       return dict(failed=failed,changed=changed,msg=msg)
       
-    # Because there is no way how to verify user's password, let's say it's always runs and always "changed"
+    # Because there is no way how to verify user's password, let's say it's always runs and always "changed".
     if self.create_user:
       failed,changed,msg = map(self.createUser().get, ('failed','changed','msg'))
       return dict(failed=failed,changed=True,msg=msg)
       
+    # No way to check if autofailver is set or not, so always return changed=True -- same for audit
     if self.auto_failover == True or self.auto_failover == False:
       failed,changed,msg = map(self.manage_autofailover().get, ('failed','changed','msg'))
       return dict(failed=failed,changed=True,msg=msg)
       
+    
+    if self.audit_enabled == True or self.audit_enabled == False:
+      failed,changed,msg = map(self.manage_audit().get, ('failed','changed','msg'))
+      return dict(failed=failed,changed=True,msg=msg)
+
 def main():
   fields = dict(
     # Common things
@@ -870,6 +938,10 @@ def main():
     # Failover config
     auto_failover=dict(required=False, type='bool'),
     auto_failover_timeout=dict(required=False, default="30"),
+    # Audit config
+    audit_enabled=dict(required=False, type='bool'),
+    audit_log_rotate_interval=dict(required=False, default="86400"),
+    audit_log_path=dict(required=False, default="/opt/couchbase/var/lib/couchbase/logs"),
   )
 
   module = AnsibleModule(argument_spec=fields, supports_check_mode=True)
