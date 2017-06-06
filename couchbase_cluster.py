@@ -8,6 +8,7 @@
 # 2017-05-30: Add enable LDAP
 # 2017-05-31: Add create/delete user, setting autofailover
 # 2017-06-01: Add enable/disable audit
+# 2017-06-06: Add restrict TLS, disable UI over http
 
 DOCUMENTATION = '''
 ---
@@ -88,6 +89,16 @@ options:
       - Specifies the auditing log path. This should be a path to a folder where the auditing log is kept. The folder must exist on all servers in the cluster.
     required: false
     default: /opt/couchbase/var/lib/couchbase/logs
+  restrict_tls:
+    description:
+      - Restrict TLS to 1.2
+    required: false
+    default: false
+  http_ui_enabled:
+    description:
+      - Enable or disable the GUI over http
+    required: false
+    default: false
   bucket_create:
     description:
       - If a bucket should be created. User run_once: True in your tasks
@@ -192,6 +203,17 @@ EXAMPLES = '''
       - node01
       - node02
     audit_enabled: True
+  run_once: True
+  no_log: True
+  
+- name: "Restrict TLS"
+  couchbase_cluster:
+    cb_admin: Administrator
+    admin_password: MySuperSecretPassword
+    nodes:
+      - node01
+      - node02
+    restrict_tls: True
   run_once: True
   no_log: True
 
@@ -310,6 +332,8 @@ class Couchbase(object):
     self.audit_enabled = module.params['audit_enabled']
     self.audit_log_rotate_interval = module.params['audit_log_rotate_interval']
     self.audit_log_path = module.params['audit_log_path']
+    self.restrict_tls = module.params['restrict_tls']
+    self.http_ui_enabled = module.params['http_ui_enabled']
 
   def rename_first_node(self):
    # There is no return code, no nothing to be evaluated -- I just assume the node has been renamed OK
@@ -704,6 +728,22 @@ class Couchbase(object):
         
     return dict(failed=failed, changed=changed, msg=msg)
 
+  def manage_tls(self):
+    changed = True
+    failed = False
+    msg = "TLS has been restricted to "
+    min_version = 'tlsv1.0'
+    
+    if self.restrict_tls:
+      min_version = 'tlsv1.2'
+      
+    os.system('/usr/bin/curl -X POST -u ' + self.cb_admin + ' -p ' + self.admin_password + ' http://127.0.0.1:8091/diag/eval -d "ns_config:set(ssl_minimum_protocol, \'' + min_version + '\')"')
+    
+    msg = msg + min_version
+    
+    return dict(failed=failed, changed=changed, msg=msg)
+
+
 ### Check functions --> ###
 
   def check_init(self):
@@ -901,6 +941,10 @@ class Couchbase(object):
     if self.audit_enabled == True or self.audit_enabled == False:
       failed,changed,msg = map(self.manage_audit().get, ('failed','changed','msg'))
       return dict(failed=failed,changed=True,msg=msg)
+      
+    if self.restrict_tls == True or self.restrict_tls == False:
+      failed,changed,msg = map(self.manage_tls().get, ('failed','changed','msg'))
+      return dict(failed=failed,changed=True,msg=msg)
 
 def main():
   fields = dict(
@@ -942,6 +986,9 @@ def main():
     audit_enabled=dict(required=False, type='bool'),
     audit_log_rotate_interval=dict(required=False, default="86400"),
     audit_log_path=dict(required=False, default="/opt/couchbase/var/lib/couchbase/logs"),
+    # Security hardening
+    restrict_tls=dict(required=False, default=False, type='bool'),
+    http_ui_enabled=dict(required=False, default=True, type='bool'),
   )
 
   module = AnsibleModule(argument_spec=fields, supports_check_mode=True)
