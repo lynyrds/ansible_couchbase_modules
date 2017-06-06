@@ -21,16 +21,15 @@
 Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variable, or alongside playbook under `./library`
 
 ### Notes
-* The list of all nodes is needed to reliably detect the cluster's orchestrator.
-* Tasks to init, rebalance and bucket create should be set to run once (`run_once: True`)
-* Check mode is supported, but not for enabling LDAP as there is no way to verify if it is enabled or not, same goes for setting autofailover and audit
+* The list of all nodes is needed to reliably detect the cluster's orchestrator
+* Tasks to init, rebalance, bucket create, auto failover setting, audit setting, user create/delete, ldap setting should be set to run once (`run_once: True`)
+* Check mode is not supported for enabling LDAP, setting autofailover and audit
 * RBAC user create is checked for everything but password. That means, create_user: True is going to be executed every time.
 * For more details on RBAC please refer to the official Couchbase documentation:
   https://developer.couchbase.com/documentation/server/5.0/security/security-authorization.html
 * Rebalance won't be issued if a bucket is found. Use `force: True` to rebalance anyway.
 * For more details on LDAP/PAM authentication please refer to the official Couchbase documentation: 
   https://developer.couchbase.com/documentation/server/5.0/security/security-authentication.html
-* 
 * Tested on RHEL6 with Ansible 2.3 and Couchbase Enterprise 5.0 beta build
 
 ### Example playbook
