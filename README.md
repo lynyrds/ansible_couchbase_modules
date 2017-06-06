@@ -12,6 +12,7 @@
 * Manage autofailover
 * Manage audit
 * Restrict TLS to 1.2
+* Disable GUI over http
  
 ### Prerequisites
 * Ansible >= 2.3
@@ -106,6 +107,17 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
         - node01
         - node02
       restrict_tls: True
+    run_once: True
+    no_log: True
+
+  - name: "Disable GUI over http"
+    couchbase_cluster:
+      cb_admin: Administrator
+      admin_password: MySuperSecretPassword
+      nodes:
+        - node01
+        - node02
+      http_ui_enabled: False
     run_once: True
     no_log: True
 
