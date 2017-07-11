@@ -9,7 +9,6 @@
 # 2017-05-31: Add create/delete user, setting autofailover
 # 2017-06-01: Add enable/disable audit
 # 2017-06-06: Add restrict TLS, disable UI over http
-# 2017-07-11: Fix check functions to work with the 5.0.0-3217 build
 
 DOCUMENTATION = '''
 ---
