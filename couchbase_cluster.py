@@ -783,6 +783,7 @@ class Couchbase(object):
     if (masters['cluster'] == default) and (masters['local'] == default):
       msg = "New cluster found, will initialize..."
       changed = True
+
     if masters['cluster'] != default:
       msg = "Found an orchestrator node: " + masters['cluster']
 
@@ -795,6 +796,7 @@ class Couchbase(object):
     if masters['cluster'] != default and masters['local'] == default:
       msg = "New node found, will join..."
       changed = True
+
     if masters['cluster'] != default and masters['local'] != default:
       msg = "The node " + my_name + " is already part of the cluster " + masters['cluster']
 
@@ -813,7 +815,8 @@ class Couchbase(object):
 
     if stdout.strip() == "":
       changed = True
-    elif rc == 1:
+
+    if rc == 1:
       if "not initialized" in stdout:
         failed = True
         msg = "Trying to rebalance on a not initialized cluster / node?"
