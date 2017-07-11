@@ -9,6 +9,7 @@
 # 2017-05-31: Add create/delete user, setting autofailover
 # 2017-06-01: Add enable/disable audit
 # 2017-06-06: Add restrict TLS, disable UI over http
+# 2017-07-11: Fix check functions to work with the 5.0.0-3217 build
 
 DOCUMENTATION = '''
 ---
@@ -782,7 +783,7 @@ class Couchbase(object):
     if (masters['cluster'] == default) and (masters['local'] == default):
       msg = "New cluster found, will initialize..."
       changed = True
-    elif masters['cluster'] != default:
+    if masters['cluster'] != default:
       msg = "Found an orchestrator node: " + masters['cluster']
 
     return dict(failed=failed, changed=changed, msg=msg)
@@ -794,7 +795,7 @@ class Couchbase(object):
     if masters['cluster'] != default and masters['local'] == default:
       msg = "New node found, will join..."
       changed = True
-    elif masters['cluster'] != default and masters['local'] != default:
+    if masters['cluster'] != default and masters['local'] != default:
       msg = "The node " + my_name + " is already part of the cluster " + masters['cluster']
 
     return dict(failed=failed, changed=changed, msg=msg)
