@@ -5,6 +5,7 @@
 * Init a Couchbase cluster
 * Join nodes to a Couchbase cluster
 * Create a Couchbase or Ephemeral bucket
+* Setup compaction and tombstone
 * Rebalance a Couchbase cluster
 * Enable LDAP authentication
 * Create RBAC user
@@ -13,9 +14,9 @@
 * Manage audit
 * Restrict TLS to 1.2
 * Disable GUI over http
- 
+
 ### Prerequisites
-* Ansible >= 2.3
+* Ansible >= 2.4
 * python requests installed
 * Couchbase cluster binaries installed
 
@@ -32,7 +33,7 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
 * Rebalance won't be issued if a bucket is found. Use `force: True` to rebalance anyway.
 * For more details on LDAP/PAM authentication please refer to the official Couchbase documentation: 
   https://developer.couchbase.com/documentation/server/5.0/security/security-authentication.html
-* Tested on RHEL6 with Ansible 2.3 and Couchbase Enterprise 5.0 beta build
+* Tested on RHEL6 with Ansible 2.4 and Couchbase Enterprise 5.0.1 build
 
 ### Example playbook
 
@@ -42,8 +43,8 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
   tasks:
   - name: "Init cluster"
     couchbase_cluster:
-      user: Administrator
-      password: SuperSecretPassword
+      cb_admin: Administrator
+      admin_password: SuperSecretPassword
       nodes:
         - cb_node01
         - cb_node02
@@ -55,8 +56,8 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
 
   - name: "Join nodes"
     couchbase_cluster:
-      user: Administrator
-      password: SuperSecretPassword
+      cb_admin: Administrator
+      admin_password: SuperSecretPassword
       nodes:
         - cb_node01
         - cb_node02
@@ -66,8 +67,8 @@ Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variabl
 
   - name: "Rebalance"
     couchbase_cluster:
-      user: Administrator
-      password: SuperSecretPassword
+      cb_admin: Administrator
+      admin_password: SuperSecretPassword
       nodes:
         - cb_node01
         - cb_node02
