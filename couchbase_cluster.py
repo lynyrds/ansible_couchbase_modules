@@ -284,20 +284,6 @@ EXAMPLES = '''
         nodes:
             - node01
             - node02
-        bucket_create: true
-        bucket_name: iceBucket
-        bucket_mem: 1024
-        bucket_replica: 2
-    run_once: True
-    no_log: True
-    
-- name: "Create user"
-    couchbase_cluster:
-        cb_admin: Administrator
-        admin_password: MySuperSecretPassword
-        nodes:
-            - node01
-            - node02
         create_user: true
         rbac_user_name: alice
         rbac_user_password: SuperSecretThePassword123
