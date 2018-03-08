@@ -21,10 +21,10 @@
 # couchbase_cluster is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
+# GNU General Public License for more details:
+#
 # You should have received a copy of the GNU General Public License
-# along with this program. If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <http://www.gnu.org/licenses/gpl-3.0.txt>.
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
@@ -49,6 +49,11 @@ options:
         description:
             - "Couchbase admin password. Make sure you set no_log=True in your tasks!"
         required: true
+    admin_port:
+        description:
+            - "Couchbase admin port"
+        required: false
+        default: 8091
     init:
         description:
             - "Initialize cluster (please use run_once: True in your task!)"
