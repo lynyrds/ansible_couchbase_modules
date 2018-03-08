@@ -94,6 +94,15 @@ options:
             - "Rebalance the cluster (please use run_once: True in your task!). If a bucket exists, rebalance will be skipped. Use force: True to issue a rebalance anyway"
         required: false
         default: false
+    force:
+        description:
+            - Enforce a rebalance
+        required: false
+        default: false
+    nodes:
+        description:
+            - List of all nodes in the cluster
+        required: true
     cluster_mem:
         description:
             - "Couchbase RAM quota, MB"
