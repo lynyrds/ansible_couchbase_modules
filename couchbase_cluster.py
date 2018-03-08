@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-# Written by Michael Hirschberg
-#
 # Change log:
 # 2017-04-28: Initial commit
 # 2017-05-29: Add bucket creation
@@ -10,6 +8,29 @@
 # 2017-06-01: Add enable/disable audit
 # 2017-06-06: Add restrict TLS, disable UI over http
 # 2018-02-23: Fix services, add compaction and tombstone settings
+#
+# Copyright: (c) 2018, Michael Hirschberg <lynyrd@gmail.com>
+# 
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+#
+# couchbase_cluster is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# couchbase_cluster is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+ANSIBLE_METADATA = {
+    'metadata_version': '1.1',
+    'status': ['stableinterface'],
+    'supported_by': 'community'
+}
 
 DOCUMENTATION = '''
 ---
@@ -22,18 +43,15 @@ author:
 options:
     cb_admin:
         description:
-            - Couchbase admin user
+            - "Couchbase admin user"
         required: true
     admin_password:
-            - Couchbase admin password. Make sure you set no_log=True in your tasks!
+        description:
+            - "Couchbase admin password. Make sure you set no_log=True in your tasks!"
         required: true
-    admin_port:
-            - Couchbase admin port
-        required: false
-        default: 8091
     init:
         description:
-            - Initialize cluster (please use run_once: True in your task!)
+            - "Initialize cluster (please use run_once: True in your task!)"
         required: false
         default: false
     cluster_name:
@@ -43,22 +61,22 @@ options:
         default: Cluster
     services:
         description:
-            - Accepted services are "data", "index", "query", and "fts", specified as a comma-separated list
+            - Accepted services are data, index, query, and fts, specified as a comma-separated list
         required: false
         default: data
     setup_compaction:
         description:
-            - Change compaction settings (db % fragmentation, tombstone. Please use run_once: True in your task!)
+            - "Change compaction settings (db % fragmentation, tombstone. Please use run_once: True in your task!)"
         required: false
         default: false
     db_compaction:
         description:
-            - Set % disk fragmentation for data, for all buckets
+            - "Set % disk fragmentation for data, for all buckets"
         required: false
         default: 30
     tombstone:
         description:
-            - Set the metadata purge interval in days (0.04 - 60, representing 1H - 60 days)
+            - "Set the metadata purge interval in days (0.04 - 60, representing 1H - 60 days)"
         required: false
         default: 3
     join:
@@ -68,72 +86,63 @@ options:
         default: false
     rebalance:
         description:
-            - Rebalance the cluster (please use run_once: True in your task!). If a bucket exists, rebalance will be skipped. Use force: True to issue a rebalance anyway
+            - "Rebalance the cluster (please use run_once: True in your task!). If a bucket exists, rebalance will be skipped. Use force: True to issue a rebalance anyway"
         required: false
         default: false
-    force:
-        description:
-            - Enforce a rebalance
-        required: false
-        default: false
-    nodes:
-        description:
-            - List of all nodes in the cluster
-        required: true
     cluster_mem:
         description:
-            - Couchbase RAM quota, MB
+            - "Couchbase RAM quota, MB"
         required: true
     fts_mem:
         description:
-            - Full text search RAM quota, MB
+            - "Full text search RAM quota, MB"
         required: false
     index_mem:
         description:
-            - Index RAM quota, MB
+            - "Index RAM quota, MB"
         required: false
     auto_failover:
         description:
-            - Enable / disable auto failover (please use run_once: True in your task!)
+            - "Enable / disable auto failover (please use run_once: True in your task!)"
         required: false
     auto_failover_timeout:
         description:
-            - Set auto failover timeout. Minimum=5 seconds. Default=30 seconds
+            - "Set auto failover timeout. Minimum=5 seconds. Default=30 seconds"
         required: false
         default: 30
     audit_enabled:
         description:
-            - Enable or disable audit (please use run_once: True in your task!)
+            - "Enable or disable audit (please use run_once: True in your task!)"
         required: false
     audit_log_rotate_interval:
         description:
-            - Audit log rotation interval, in seconds. Default is 86400 (24 hours)
+            - "Audit log rotation interval, in seconds. Default is 86400 (24 hours)"
         required: false
         default: 86400
-  audit_log_path:
+    audit_log_path:
         description:
-            - Specifies the auditing log path. This should be a path to a folder where the auditing log is kept. The folder must exist on all servers in the cluster.
+            - "Specifies the auditing log path. This should be a path to a folder where the auditing log is kept. The folder must exist on all servers in the cluster."
         required: false
-        default: /opt/couchbase/var/lib/couchbase/logs
+        default: /opt/couchbase/var/lib/couchbase/logs        
     restrict_tls:
         description:
-            - Restrict TLS to 1.2  (please use run_once: True in your task!)
+            - "Restrict TLS to 1.2  (please use run_once: True in your task!)"
         required: false
     http_ui_enabled:
         description:
-            - Enable or disable the GUI over http (please use run_once: True in your task!)
+            - "Enable or disable the GUI over http (please use run_once: True in your task!)"
         required: false
     bucket_create:
         description:
-            - If a bucket should be created. User run_once: True in your tasks
+            - "If a bucket should be created. User run_once: True in your tasks"
         required: false
         default: false
     bucket_name:
         description:
-            - Bucket to be created. Mandatory if bucket_create=true.
+            - "Bucket to be created. Mandatory if bucket_create=true"
     bucket_mem:
         description:
-            - Memory assigned to the above bucket on each node, MB. Mandatory if bucket_create=true.
+            - "Memory assigned to the above bucket on each node, MB. Mandatory if bucket_create=true"
         required: false
     bucket_replica:
         description:
@@ -154,12 +163,12 @@ options:
         default: false
     create_user:
         description:
-            - If a user should be created. Use run_once: True in your tasks
+            - "If a user should be created. Use run_once: True in your tasks"
         reqired: false
         default: false
     delete_user:
         description:
-            - If a user should be deleted. Use run_once: True in your tasks
+            - "If a user should be deleted. Use run_once: True in your tasks"
         required: false
         default: false
     user_type:
@@ -178,7 +187,7 @@ options:
     rbac_roles:
         description:
             - A mandatory list of rbac user roles if creating a new user. For more information please refer to the official Couchbase documentation
-        required: false
+        required: false                
 '''
 
 EXAMPLES = '''
@@ -307,6 +316,13 @@ EXAMPLES = '''
     no_log: True
 '''
 
+RETURN = '''
+action:
+    description: if the taken action has failed or not
+    returned: success
+    type: string
+    sample: cluster has been configured
+'''
 
 from ansible.module_utils.basic import AnsibleModule
 from time import sleep
