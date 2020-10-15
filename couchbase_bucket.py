@@ -3,6 +3,7 @@
 # Change log:
 # 2019-06-28: Initial version
 # 2019-07-01: Initial commit. WARNING: not possible to change eviction policy if editing a bucket. This is a couchbase cli bug.
+# 2020-09-21: Add support for 6.5.x, set the bucket compaction, prepare for bucket durability
 #
 # Copyright: (c) 2018, Michael Hirschberg <lynyrd@gmail.com>
 # 
@@ -99,6 +100,12 @@ options:
         description:
             - Optional bucket TTL in seconds.
         default: 0
+    bucket_compaction:
+        description:
+            - Optional bucket compaction setting in %, from 2 to 100. Supported for CB >= 6.5
+#    bucket_durability:
+#        description:
+#            - Very optional bucket durability setting. Accepted values for "ephemeral" buckets are "none" or "majority".  "none", "majority", "majorityAndPersistActive", or "persistToMajority" for "couchbase" buckets.
     bucket_enable_flush:
         description:
             - Enable/disable bucket flush. Default is 0 (disable)
@@ -161,6 +168,8 @@ class Couchbase(object):
         self.bucket_eviction_policy = module.params['bucket_eviction_policy']
         self.bucket_compression = module.params['bucket_compression']
         self.bucket_ttl = module.params['bucket_ttl']
+        self.bucket_compaction = module.params['bucket_compaction']
+#       self.bucket_durability = module.params['bucket_durability']
         self.bucket_enable_flush = module.params['bucket_enable_flush']
 
     def manage_bucket(self, action):
@@ -207,6 +216,13 @@ class Couchbase(object):
 
             if self.bucket_type == "ephemeral":
                 cmd.extend(['--compression-mode=' + self.bucket_compression])
+
+        if self.bucket_compaction != "":
+            cmd.extend(['--database-fragmentation-threshold-percentage=' + self.bucket_compaction])
+
+#        if self.bucket_durability != '':
+#            cmd.extend(['--durability-min-level=' + self.bucket_durability])
+
 
         cmd.extend([
             '--username=' + self.cb_admin,
@@ -282,6 +298,22 @@ class Couchbase(object):
                             changed = True
                             msg = msg + "Eviction type will be changed. "
 
+                        try:
+                            bucket_settings['bucket_durability'] = my_bucket['durabilityMinLevel']
+                            if bucket_settings['bucket_durability'] != self.bucket_durability and self.bucket_durability != "" :
+                                changed = True
+                                msg = msg + "Durability type will be changed. "
+                        except:
+                            pass
+
+                        try: 
+                            bucket_settings['bucket_compaction'] = str(my_bucket['autoCompactionSettings']['databaseFragmentationThreshold']['percentage'])
+                            if (self.bucket_compaction != '' or self.bucket_compaction is not None) and (bucket_settings['bucket_compaction'] !=  self.bucket_compaction):
+                                changed = True
+                                msg = msg + "Compaction will be changed. "
+                        except:
+                            pass
+
             except:
                 failed = True
                 msg = "Connection to the Couchbase REST API has failed!"
@@ -312,6 +344,8 @@ def main():
         bucket_conflict_resolution=dict(required=False, default="sequence", choices=["sequence", "timestamp"]),
         bucket_eviction_policy=dict(required=False, default="nruEviction", choices=["valueOnly", "fullEviction", "noEviction", "nruEviction"]),
         bucket_compression=dict(required=False, default="passive", choices=["passive", "off", "active"]),
+        bucket_compaction=dict(required=False, default=""),
+#        bucket_durability=dict(required=False, default="", choices=["", "none", "majority", "majorityAndPersistActive", "persistToMajority"]),
         bucket_ttl=dict(required=False, default="0"),
         bucket_enable_flush=dict(required=False, default="0", choices=["0", "1"])
     )
