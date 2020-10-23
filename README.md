@@ -26,7 +26,7 @@
 ### Prerequisites
 * Ansible >= 2.4
 * python requests installed
-* Couchbase cluster binaries installed, tested on 6.x. Not verified on 6.5.x !
+* Couchbase cluster binaries installed, tested on 6.6 and below, no support for < 6.0
 
 ### Installing
 Place these modules in some folder present in the `ANSIBLE_LIBRARY` path variable, or alongside playbook under `./library`
