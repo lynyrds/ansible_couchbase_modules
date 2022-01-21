@@ -1,10 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 
 # Change log:
 # 2018-07-12: Initial commit
 # 2018-07-31: Support moving server(s) from any to any group
 # 2018-08-02: Add node's health check
 # 2020-09-30: Add 6.5 support: CB version check, user and group list
+# 2022-01-22: Dropped support for all versions below 6.6, now looking for the orchestrator using the official REST API
+#             https://docs.couchbase.com/server/current/rest-api/rest-identify-orchestrator.html
 #
 # Copyright: (c) 2018, Michael Hirschberg <lynyrd@gmail.com>
 # 
@@ -44,7 +46,6 @@ my_name = socket.gethostname()
 default = "127.0.0.1"
 all_cl_membership = ["active", "inactiveFailed", "inactiveAdded"]
 all_node_status = ["healthy", "warmup", "unhealthy"]
-cb_version_split = "6.5.0"
 tls_min_version = "tlsv1.2"
 disabled_users = ['@ns_server/local', '@cbq-engine/local', '@projector/local', '@goxdcr/local', '@index/local']
 
@@ -58,57 +59,41 @@ def check_new(cluster):
     # - a message
     # Fails :
     # If all nodes don't have an orchestrator
-    all_orchestrators = {}
-    all_local_orchestrators = {}
-    orchestra = {}
+    all_orchestrators = []
+    orchestra = []
     orchestrators = {}
     msg = ""
     failed = False
     port = str(cluster.admin_port)
-    payload = "node(global:whereis_name(ns_orchestrator))"
-    payload_55 = "mb_master:master_node()"
     my_orch = ""
 
-    def get_master(my_node,authorize=True):
-        url = "http://" + my_node + ":" + port + "/diag/eval"
+    def get_master(my_node):
+        url = "http://" + my_node + ":" + port + "/pools/default/terseClusterInfo"
         orch = ""
         try:
-            if authorize:
-                orch = requests.post(url, data=payload, auth=(cluster.cb_admin,cluster.admin_password)).text
+            tmp_orch = requests.get(url, auth=(cluster.cb_admin,cluster.admin_password))
+            if tmp_orch.status_code == 200:
+                orch = tmp_orch.json()['orchestrator']
             else:
-                orch = requests.post(url, data=payload).text
-            if "error" in orch and "failed" in orch:
-                if authorize:
-                    orch = requests.post(url, data=payload_55, auth=(cluster.cb_admin,cluster.admin_password)).text
-                else:
-                    orch = requests.post(url, data=payload_55).text
+                orch = default
         except:
             orch = "failed"
         return orch
 
-    # Build a list of all orchestrators, try to authorize
+    # Build a list of all orchestrators
     for node in cluster.nodes:
         my_orch = get_master(node)
         if my_orch != "failed":
-            all_orchestrators[node] = my_orch
-        else:
-            failed = True
-
-    # Build a list of all orchestrators, do not authorize
-    for node in cluster.nodes:
-        my_orch = get_master(node,authorize=False)
-        if my_orch != "failed":
-            all_local_orchestrators[node] = my_orch
+            all_orchestrators.append(my_orch)
         else:
             failed = True
 
     # Get cluster orchestrator
-    orchestra = dict(set(all_orchestrators.items()) - set(all_local_orchestrators.items()))
-
-    if orchestra == {}:
+    orchestra = list(set(all_orchestrators))
+    if len(orchestra) == 1 and default == orchestra[0]:
         orchestrators['cluster'] = default
     else:
-        orchestrators['cluster'] = orchestra.values()[0][6:][:-1]
+        orchestrators['cluster'] = orchestra[0][5:]
 
     # Now, let's get a local one
     my_orch = get_master(default)
