@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 
 # Change log:
 # 2019-07-02: Initial commit
@@ -184,9 +184,7 @@ class Couchbase(object):
         ]
 
         node_state = get_health(self)
-        if cb_version_split <= node_state['version']:
-            cmd.extend(['--set'])
-
+        cmd.extend(['--set'])
 
         if self.audit_enabled:
             cmd.extend(['--audit-enabled=1'])
@@ -195,17 +193,14 @@ class Couchbase(object):
             '--audit-log-path=' + self.audit_log_path,
             ])
 
-            if cb_version_split <= node_state['version']:
-                if self.disable_local_users:
-                    all_users = get_users(self)
-                    for user in all_users['local']:
-                        disabled_users.append(user['name']+'/local')
-                    my_disabled_users = ','.join(disabled_users)
-                    cmd.extend(['--disabled-users=' + my_disabled_users])
-                if self.disabled_events != '':
-                    cmd.extend(['--disable-events=' + self.disabled_events])
-        else:
-            cmd.extend(['--audit-enabled=0'])
+            if self.disable_local_users:
+                all_users = get_users(self)
+                for user in all_users['local']:
+                    disabled_users.append(user['name']+'/local')
+                my_disabled_users = ','.join(disabled_users)
+                cmd.extend(['--disabled-users=' + my_disabled_users])
+            if self.disabled_events != '':
+                cmd.extend(['--disable-events=' + self.disabled_events])
 
         rc, stdout, stderr = self.module.run_command(cmd)
 
@@ -214,7 +209,7 @@ class Couchbase(object):
         else:
             failed = True
 
-        msg = msg + stderr
+        msg = stdout + stderr
 
         return dict(failed=failed, changed=changed, msg=msg)
 
@@ -317,10 +312,7 @@ class Couchbase(object):
         ]
 
         node_state = get_health(self)
-        if cb_version_split <= node_state['version']:
-            cmd.extend(['--enable-notifications=' + enable])
-        else:
-            cmd.extend(['--enable-notification=' + enable])
+        cmd.extend(['--enable-notifications=' + enable])
 
         rc, stdout, stderr = self.module.run_command(cmd)
 
@@ -394,38 +386,22 @@ class Couchbase(object):
 
         if self.restrict_tls == True or self.restrict_tls == False:
             node_state = get_health(self)
-            if cb_version_split <= node_state['version']:
-                failed,changed,msg = map(self.manage_tls_cli().get, ('failed','changed','msg')) 
-            else:
-                failed,changed,msg = map(self.manage_tls().get, ('failed','changed','msg'))
+            failed,changed,msg = map(self.manage_tls_cli().get, ('failed','changed','msg')) 
             return dict(failed=failed,changed=True,msg=msg)
 
         if self.http_ui_enabled == True or self.http_ui_enabled == False:
             node_state = get_health(self)
-            if cb_version_split <= node_state['version']:
-                failed,changed,msg = map(self.manage_http_ui_cli().get, ('failed','changed','msg'))
-            else:
-                failed,changed,msg = map(self.manage_http_ui().get, ('failed','changed','msg'))
+            failed,changed,msg = map(self.manage_http_ui_cli().get, ('failed','changed','msg'))
             return dict(failed=failed,changed=True,msg=msg)
 
         if self.cipher_suites != "":
             node_state = get_health(self)
-            if cb_version_split <= node_state['version']:
-                failed,changed,msg = map(self.manage_ciphers().get, ('failed','changed','msg'))
-            else:
-                failed=False
-                changed=False
-                msg="Not supported on Couchbase <= 6.5"
+            failed,changed,msg = map(self.manage_ciphers().get, ('failed','changed','msg'))
             return dict(failed=failed,changed=True,msg=msg)
 
         if self.session_timeout != "":
             node_state = get_health(self)
-            if cb_version_split <= node_state['version']:
-                failed,changed,msg = map(self.manage_session().get, ('failed','changed','msg'))
-            else:
-                failed=False
-                changed=False
-                msg="Not supported on Couchbase <= 6.5"
+            failed,changed,msg = map(self.manage_session().get, ('failed','changed','msg'))
             return dict(failed=failed,changed=True,msg=msg)
 
 def main():
