@@ -7,6 +7,7 @@
 # 2020-09-30: Add 6.5 support: CB version check, user and group list
 # 2022-01-22: Dropped support for all versions below 6.6, now looking for the orchestrator using the official REST API
 #             https://docs.couchbase.com/server/current/rest-api/rest-identify-orchestrator.html
+# 2022-11-18: Fixed orchestrator detection
 #
 # Copyright: (c) 2018, Michael Hirschberg <lynyrd@gmail.com>
 # 
@@ -93,8 +94,10 @@ def check_new(cluster):
     if len(orchestra) == 1 and default == orchestra[0]:
         orchestrators['cluster'] = default
     else:
-        orchestrators['cluster'] = orchestra[0][5:]
-
+        for orchestrant in orchestra:
+            if orchestrant != default:
+                orchestrators['cluster'] = orchestrant[5:]
+                
     # Now, let's get a local one
     my_orch = get_master(default)
     orchestrators['local'] = my_orch
